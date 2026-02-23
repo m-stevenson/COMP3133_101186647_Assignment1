@@ -37,11 +37,8 @@ async function uploadPhoto(base64DataUri) {
 
 const resolvers = {
   Query: {
-    // 2) Login
-    login: async (_, { input }) => {
+    login: async (_, { usernameOrEmail, password }) => {
       try {
-        const { usernameOrEmail, password } = input;
-
         const user = await User.findOne({
           $or: [{ username: usernameOrEmail }, { email: usernameOrEmail }],
         }).select("+password");
@@ -53,13 +50,11 @@ const resolvers = {
 
         const token = jwt.sign(
           { userId: user._id, username: user.username },
-          process.env.JWT_SECRET,
+          process.env.JWT_SECRET
         );
 
         return {
-          _id: user._id,
-          username: user.username,
-          email: user.email,
+          user: { _id: user._id, username: user.username, email: user.email },
           token,
         };
       } catch (err) {
@@ -67,7 +62,6 @@ const resolvers = {
       }
     },
 
-    // 3) Get all employees
     getAllEmployees: async () => {
       try {
         return await Employee.find();
@@ -76,7 +70,6 @@ const resolvers = {
       }
     },
 
-    // 5) Search employee by eid
     getEmployeeById: async (_, { eid }) => {
       try {
         if (!isValidObjectId(eid)) throw new Error("Invalid employee id");
@@ -86,7 +79,6 @@ const resolvers = {
       }
     },
 
-    // 8) Search by designation or department
     searchEmployees: async (_, { designation, department }) => {
       try {
         const query = {};
@@ -100,30 +92,18 @@ const resolvers = {
   },
 
   Mutation: {
-    // 1) Signup
-    signup: async (_, { input }) => {
+    signup: async (_, { username, email, password }) => {
       try {
-        const { username, email, password } = input;
-
-        const hashed = await bcrypt.hash(password, 10);
-
-        const user = new User({
-          username,
-          email,
-          password: hashed,
-        });
-
+        const user = new User({ username, email, password });
         await user.save();
 
         const token = jwt.sign(
           { userId: user._id, username: user.username },
-          process.env.JWT_SECRET,
+          process.env.JWT_SECRET
         );
 
         return {
-          _id: user._id,
-          username: user.username,
-          email: user.email,
+          user: { _id: user._id, username: user.username, email: user.email },
           token,
         };
       } catch (err) {
@@ -131,15 +111,32 @@ const resolvers = {
       }
     },
 
-    // 4) Add new employee
-    addEmployee: async (_, { input }) => {
+    addEmployee: async (
+      _,
+      {
+        first_name,
+        last_name,
+        email,
+        gender,
+        designation,
+        salary,
+        date_of_joining,
+        department,
+        employee_photo_base64,
+      }
+    ) => {
       try {
-        const { employee_photo_base64, ...rest } = input;
-
         const photoUrl = await uploadPhoto(employee_photo_base64);
 
         const employee = new Employee({
-          ...rest,
+          first_name,
+          last_name,
+          email,
+          gender,
+          designation,
+          salary,
+          date_of_joining: new Date(date_of_joining),
+          department,
           employee_photo: photoUrl,
         });
 
@@ -149,18 +146,19 @@ const resolvers = {
       }
     },
 
-    // 6) Update employee by eid
-    updateEmployee: async (_, { eid, input }) => {
+    updateEmployee: async (_, { eid, ...updates }) => {
       try {
         if (!isValidObjectId(eid)) throw new Error("Invalid employee id");
 
-        const updates = { ...input };
-
         if (updates.employee_photo_base64) {
           updates.employee_photo = await uploadPhoto(
-            updates.employee_photo_base64,
+            updates.employee_photo_base64
           );
           delete updates.employee_photo_base64;
+        }
+
+        if (updates.date_of_joining) {
+          updates.date_of_joining = new Date(updates.date_of_joining);
         }
 
         return await Employee.findByIdAndUpdate(eid, updates, {
@@ -172,7 +170,6 @@ const resolvers = {
       }
     },
 
-    // 7) Delete employee by eid
     deleteEmployeeById: async (_, { eid }) => {
       try {
         if (!isValidObjectId(eid)) throw new Error("Invalid employee id");
