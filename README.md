@@ -1,4 +1,7 @@
 # COMP3133_101186647_Assignment1
-Sample user details: 
+
+## Run with docker compose up -d --build
+
+Sample user details:
 username: mitchell123
 password: password123
